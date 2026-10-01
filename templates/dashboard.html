@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhatsApp Bot — Painel</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #8b93a7; --accent: #25d366; --accent2: #4f9cf9;
+    --warn: #f5a623; --danger: #e5484d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 18px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--accent); } .dot.bad { background: var(--danger); }
+  .dot.warn { background: var(--warn); }
+  .muted { color: var(--muted); }
+  main { padding: 20px 24px 60px; max-width: 1240px; margin: 0 auto; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 22px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 15px 17px; }
+  .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .card .value { font-size: 26px; font-weight: 650; margin-top: 5px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+    margin: 26px 0 10px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel2); color: var(--muted); font-size: 12px; text-transform: uppercase;
+    letter-spacing: .04em; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    padding: 5px 11px; border-radius: 7px; cursor: pointer; font-size: 12.5px; }
+  button:hover { border-color: var(--accent2); color: #fff; }
+  input, textarea { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 10px; font: inherit; width: 100%; }
+  textarea { min-height: 62px; resize: vertical; font-family: ui-monospace, monospace; font-size: 13px; }
+  .row { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
+  .tag.faq { background: rgba(37,211,102,.15); color: var(--accent); }
+  .tag.ai { background: rgba(79,156,249,.15); color: var(--accent2); }
+  .tag.fallback { background: rgba(245,166,35,.15); color: var(--warn); }
+  .tag.system, .tag.manual { background: rgba(139,147,167,.15); color: var(--muted); }
+  .tag.human { background: rgba(229,72,77,.15); color: var(--danger); }
+  .tag.bot { background: rgba(37,211,102,.15); color: var(--accent); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 15px 17px; }
+  pre { background: var(--panel2); padding: 11px; border-radius: 8px; overflow-x: auto; font-size: 12.5px; margin: 8px 0 0; }
+  .err { color: var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="statusDot"></span>
+  <h1>WhatsApp Bot — Painel</h1>
+  <span class="muted" id="statusText">carregando…</span>
+  <span style="flex:1"></span>
+  <span class="muted" id="lastUpdate"></span>
+  <button onclick="refreshAll()">Atualizar</button>
+</header>
+
+<main>
+  <div class="grid">
+    <div class="card"><div class="label">Conversas</div><div class="value" id="kConversas">–</div></div>
+    <div class="card"><div class="label">Recebidas</div><div class="value" id="kIn">–</div></div>
+    <div class="card"><div class="label">Enviadas</div><div class="value" id="kOut">–</div></div>
+    <div class="card"><div class="label">Taxa automação</div><div class="value" id="kAuto">–</div></div>
+    <div class="card"><div class="label">Latência média</div><div class="value" id="kLat">–</div></div>
+    <div class="card"><div class="label">Fila humana</div><div class="value" id="kHuman">–</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div style="flex:1; min-width:260px">
+        <div class="label muted" style="font-size:12px; margin-bottom:5px">Testar o motor de resposta (não envia nada)</div>
+        <input id="simInput" placeholder="ex.: qual o prazo de entrega?" onkeydown="if(event.key==='Enter')simulate()">
+      </div>
+      <button onclick="simulate()" style="align-self:flex-end">Simular</button>
+    </div>
+    <pre id="simOut" style="display:none"></pre>
+  </div>
+
+  <h2>Respostas por origem</h2>
+  <table><thead><tr><th>Origem</th><th>Quantidade</th></tr></thead><tbody id="srcTable"></tbody></table>
+
+  <h2>Conversas</h2>
+  <table>
+    <thead><tr><th>Contato</th><th>Nome</th><th>Estado</th><th>Msgs</th><th>Última</th><th></th></tr></thead>
+    <tbody id="convTable"></tbody>
+  </table>
+
+  <h2>Eventos recentes</h2>
+  <table><thead><tr><th>Quando</th><th>Tipo</th><th>Contato</th><th>Detalhe</th></tr></thead>
+    <tbody id="evtTable"></tbody></table>
+
+  <h2>Base de conhecimento (FAQ)</h2>
+  <table><thead><tr><th>ID</th><th>Tópico</th><th>Palavras-chave</th><th></th></tr></thead>
+    <tbody id="faqTable"></tbody></table>
+
+  <h2>Adicionar item ao FAQ</h2>
+  <div class="panel">
+    <div class="grid" style="margin-bottom:10px">
+      <div><div class="label muted" style="font-size:12px">ID</div><input id="fId" placeholder="meu_topico"></div>
+      <div><div class="label muted" style="font-size:12px">Tópico</div><input id="fTopic" placeholder="Assunto"></div>
+      <div style="grid-column: 1 / -1"><div class="label muted" style="font-size:12px">Palavras-chave (separadas por vírgula)</div>
+        <input id="fKw" placeholder="palavra1, palavra2"></div>
+      <div style="grid-column: 1 / -1"><div class="label muted" style="font-size:12px">Pergunta</div><input id="fQ" placeholder="Título da pergunta"></div>
+      <div style="grid-column: 1 / -1"><div class="label muted" style="font-size:12px">Resposta</div>
+        <textarea id="fA" placeholder="Texto enviado ao cliente"></textarea></div>
+    </div>
+    <button onclick="addFaq()">Salvar item</button>
+    <span id="faqMsg" class="muted" style="margin-left:10px"></span>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = (v) => (v * 100).toFixed(1) + '%';
+
+async function get(path) { const r = await fetch(path); return r.json(); }
+
+async function loadHealth() {
+  try {
+    const h = await get('/health');
+    const ai = h.ai || {};
+    const ok = h.status === 'healthy';
+    $('statusDot').className = 'dot ' + (ok ? (ai.reachable === false ? 'warn' : 'ok') : 'bad');
+    const parts = [h.status];
+    parts.push('IA: ' + (ai.enabled ? ai.provider + (ai.model ? '/' + ai.model : '') : 'desativada'));
+    parts.push('WhatsApp: ' + (h.whatsapp?.configured ? 'configurado' : 'não configurado'));
+    parts.push('FAQ: ' + (h.database?.faq_items ?? 0) + ' itens');
+    if (h.out_of_hours) parts.push('fora do horário');
+    $('statusText').textContent = parts.join(' · ');
+  } catch (e) {
+    $('statusDot').className = 'dot bad';
+    $('statusText').innerHTML = '<span class="err">API inacessível</span>';
+  }
+}
+
+async function loadStats() {
+  const d = await get('/api/stats');
+  const s = d.stats || {};
+  $('kConversas').textContent = s.total_conversations ?? 0;
+  $('kIn').textContent = s.messages_in ?? 0;
+  $('kOut').textContent = s.messages_out ?? 0;
+  $('kAuto').textContent = pct(s.automation_rate ?? 0);
+  $('kLat').textContent = s.avg_response_latency_ms != null ? s.avg_response_latency_ms + ' ms' : '–';
+  $('kHuman').textContent = s.conversations_waiting_human ?? 0;
+
+  const src = s.responses_by_source || {};
+  $('srcTable').innerHTML = Object.keys(src).length
+    ? Object.entries(src).sort((a,b) => b[1]-a[1]).map(([k,v]) =>
+        `<tr><td><span class="tag ${esc(k)}">${esc(k)}</span></td><td>${v}</td></tr>`).join('')
+    : '<tr><td colspan="2" class="muted">sem dados</td></tr>';
+}
+
+async function loadConversations() {
+  const d = await get('/api/conversations?limit=25');
+  const rows = d.conversations || [];
+  $('convTable').innerHTML = rows.length ? rows.map(c => `
+    <tr>
+      <td><code>${esc(c.wa_id)}</code></td>
+      <td>${esc(c.name || '–')}</td>
+      <td><span class="tag ${esc(c.state)}">${esc(c.state)}</span></td>
+      <td>${c.message_count}</td>
+      <td class="muted">${esc((c.last_message_at || c.created_at || '').replace('T',' ').slice(0,16))}</td>
+      <td>${c.state === 'human' ? `<button onclick="release('${esc(c.wa_id)}')">devolver ao bot</button>` : ''}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="muted">nenhuma conversa ainda</td></tr>';
+}
+
+async function loadEvents() {
+  const d = await get('/api/events?limit=20');
+  const rows = d.events || [];
+  $('evtTable').innerHTML = rows.length ? rows.map(e => `
+    <tr>
+      <td class="muted">${esc((e.created_at || '').replace('T',' ').slice(0,19))}</td>
+      <td><code>${esc(e.event_type)}</code></td>
+      <td><code>${esc(e.wa_id || '–')}</code></td>
+      <td class="muted">${esc(JSON.stringify(e.payload || {}).slice(0, 90))}</td>
+    </tr>`).join('') : '<tr><td colspan="4" class="muted">sem eventos</td></tr>';
+}
+
+async function loadFaq() {
+  const d = await get('/api/faq');
+  const rows = d.items || [];
+  $('faqTable').innerHTML = rows.length ? rows.map(i => `
+    <tr>
+      <td><code>${esc(i.id)}</code></td>
+      <td>${esc(i.topic)}</td>
+      <td class="muted">${esc((i.keywords || []).join(', '))}</td>
+      <td><button onclick="delFaq('${esc(i.id)}')">excluir</button></td>
+    </tr>`).join('') : '<tr><td colspan="4" class="muted">base vazia</td></tr>';
+}
+
+async function simulate() {
+  const message = $('simInput').value.trim();
+  if (!message) return;
+  const out = $('simOut');
+  out.style.display = 'block';
+  out.textContent = 'consultando…';
+  try {
+    const d = await (await fetch('/api/faq/test', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ message })
+    })).json();
+    const r = d.response || {};
+    const rank = (d.ranking || []).map(x => `  ${x.score.toFixed(0).padStart(3)}  ${x.id}`).join('\n');
+    out.textContent =
+      `entrada   : ${d.input}\n` +
+      `decisão   : ${r.type}${r.faq_id ? ' → ' + r.faq_id : ''}  (confiança ${(r.confidence ?? 0).toFixed(2)})\n` +
+      `resposta  : ${(r.answer || '').split('\n')[0]}\n` +
+      (rank ? `\nranking   :\n${rank}` : '');
+  } catch (e) { out.textContent = 'erro: ' + e.message; }
+}
+
+async function release(waId) {
+  await fetch(`/api/conversations/${waId}/release`, { method: 'POST' });
+  refreshAll();
+}
+
+async function addFaq() {
+  const body = {
+    id: $('fId').value.trim(), topic: $('fTopic').value.trim(),
+    keywords: $('fKw').value.split(',').map(s => s.trim()).filter(Boolean),
+    question: $('fQ').value.trim(), answer: $('fA').value.trim()
+  };
+  if (!body.id || !body.keywords.length || !body.question || !body.answer) {
+    $('faqMsg').innerHTML = '<span class="err">preencha id, palavras-chave, pergunta e resposta</span>';
+    return;
+  }
+  const r = await fetch('/api/faq', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+  });
+  $('faqMsg').textContent = r.ok ? 'salvo ✓' : 'erro ao salvar';
+  if (r.ok) { ['fId','fTopic','fKw','fQ','fA'].forEach(i => $(i).value = ''); loadFaq(); }
+}
+
+async function delFaq(id) {
+  if (!confirm('Excluir o item ' + id + '?')) return;
+  await fetch('/api/faq/' + id, { method: 'DELETE' });
+  loadFaq();
+}
+
+async function refreshAll() {
+  await Promise.allSettled([loadHealth(), loadStats(), loadConversations(), loadEvents(), loadFaq()]);
+  $('lastUpdate').textContent = 'atualizado ' + new Date().toLocaleTimeString('pt-BR');
+}
+
+refreshAll();
+setInterval(refreshAll, 15000);
+</script>
+</body>
+</html>
